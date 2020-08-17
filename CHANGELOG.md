@@ -1,5 +1,5 @@
 ##20200817
-*自己尝试编译看看
+*自己尝试编译看
 ## 20200815
 * 开启 luci-app-adguardhome
 * 开启 luci-app-jd-dailybonus
