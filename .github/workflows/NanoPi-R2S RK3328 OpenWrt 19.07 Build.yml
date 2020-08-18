@@ -132,6 +132,72 @@ jobs:
           sed -i '/Load Average/i\\t\t<tr><td width="33%"><%:CPU Temperature%></td><td><%=luci.sys.exec("cut -c1-2 /sys/class/thermal/thermal_zone0/temp")%><span>&#8451;</span></td></tr>' friendlywrt/feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status/index.htm
           sed -i 's/pcdata(boardinfo.system or "?")/"ARMv8"/' friendlywrt/feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status/index.htm
           sed -i 's/services/vpn/g' friendlywrt/package/feeds/luci/luci-app-openvpn/luasrc/controller/openvpn.lua
+          
+      - name: Mods
+        run: |
+          cd friendlywrt-rk3328
+          . ../remove_unused_config.sh
+          cat configs/config_rk3328 | grep "TARGET" >> ../base_rk3328.seed
+          cat ../app_config.seed >> ../base_rk3328.seed
+          cat ../base_rk3328.seed > configs/config_rk3328
+          echo '
+          CONFIG_PACKAGE_luci-app-passwall=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Brook=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Trojan=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_simple-obfs=y
+          CONFIG_PACKAGE_luci-app-passwall_INCLUDE_v2ray-plugin=y
+          CONFIG_PACKAGE_luci-app-hd-idle=y
+          CONFIG_PACKAGE_luci-app-minidlna=y
+          CONFIG_PACKAGE_luci-app-transmission=y
+          # CONFIG_V2RAY_COMPRESS_UPX is not set
+          ' >> configs/config_rk3328
+          cd friendlywrt
+          git config --local user.email "action@github.com" && git config --local user.name "GitHub Action"
+          git remote add upstream https://github.com/coolsnowwolf/lede && git fetch upstream
+          git rebase adc1a9a3676b8d7be1b48b5aed185a94d8e42728^ --onto upstream/master -X theirs
+          git revert --no-edit 8faac30089ce616940b3e96c4f4d900aeb6b9fcb
+          sed -i '/ipv6/,+3d' package/base-files/files/root/setup.sh
+          git checkout upstream/master -- feeds.conf.default
+          cd package/lean/
+          #git clone https://github.com/jerrykuku/lua-maxminddb.git
+          #git clone https://github.com/jerrykuku/luci-app-vssr.git
+          #cd luci-app-vssr/root/etc/
+          #echo 'china_ssr.txt
+          #config/black.list
+          #config/white.list
+          #dnsmasq.oversea/oversea_list.conf
+          #dnsmasq.ssr/ad.conf
+          #dnsmasq.ssr/gfw_base.conf' | xargs rm
+          #cd ../../../
+          rm -rf luci-theme-argon
+          git clone -b 18.06 https://github.com/jerrykuku/luci-theme-argon.git
+          cd ../../
+          git apply ../../enable_autocore.diff
+          #git apply ../../fix_cpufreq.diff
+          sed -i '/uci commit luci/i\uci set luci.main.mediaurlbase="/luci-static/argon"' package/lean/default-settings/files/zzz-default-settings
+          sed -i '/exit/i\chown -R root:root /usr/share/netdata/web' package/lean/default-settings/files/zzz-default-settings
+          sed -i '/exit/i\find /etc/rc.d/ -name *docker* -delete' package/lean/default-settings/files/zzz-default-settings
+          sed -i 's/option fullcone\t1/option fullcone\t0/' package/network/config/firewall/files/firewall.config
+          sed -i '/8.8.8.8/d' package/base-files/files/root/setup.sh
+          mv ../../scripts/check_wan4.sh package/base-files/files/usr/bin && sed -i '/exit/i\/bin/sh /usr/bin/check_wan4.sh &' package/base-files/files/etc/rc.local
+          echo -e '\nDYC Build\n'  >> package/base-files/files/etc/banner
+          
+      - name: Add Passwall
+        run: |
+          cd friendlywrt-rk3328/friendlywrt
+          echo -e '\nsrc-git lienol https://github.com/Lienol/openwrt-package' >> feeds.conf.default
+          ./scripts/feeds update -a
+          rm -rf feeds/lienol/lienol/ipt2socks
+          rm -rf feeds/lienol/lienol/shadowsocksr-libev
+          rm -rf feeds/lienol/lienol/pdnsd-alt
+          rm -rf feeds/lienol/package/verysync
+          rm -rf feeds/lienol/lienol/luci-app-verysync
+          rm -rf package/lean/luci-app-kodexplorer
+          rm -rf package/lean/luci-app-pppoe-relay
+          rm -rf package/lean/luci-app-pptp-server
+          rm -rf package/lean/luci-app-v2ray-server
+          ./scripts/feeds install -a
 
       - name: Patch Kernel
         run: |
